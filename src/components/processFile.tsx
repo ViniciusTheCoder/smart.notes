@@ -140,10 +140,10 @@ export default function UploadSection() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Pronto para Começar?
+            Ready to Start?
           </h2>
           <p className="mt-6 text-lg leading-8 text-gray-600">
-            Faça upload do seu arquivo de áudio ou vídeo e deixe nossa IA fazer o resto
+            Upload your files and let AI do their magic.
           </p>
         </div>
 

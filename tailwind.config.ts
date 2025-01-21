@@ -53,6 +53,11 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      fontFamily: {
+        display: ['Clash Display', 'sans-serif'], 
+        secondary: ['Plus Jakarta Sans', 'sans-serif'], 
+        sans: ['Inter', 'sans-serif'],  
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
