@@ -17,32 +17,28 @@ s3_client = boto3.client('s3')
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
-BUCKET_NAME = os.getenv("BUCKET_NAME")
+bucket = os.getenv("BUCKET_NAME")
 TRANSCRIPTION_OUTPUT_PREFIX = os.getenv("TRANSCRIPTION_OUTPUT_PREFIX", "transcriptions/")
 
 MAX_CONTENT_SIZE = 25 * 1024 * 1024  
 
 def lambda_handler(event, context):
-    """
-    Função Lambda que realiza a transcrição do áudio utilizando a API Whisper da OpenAI.
-    Retorna apenas o texto completo da transcrição.
-    """
+
     try:
         summary_id = event.get('summaryId')
-        bucket = event.get('bucket')
         
         if not summary_id or not bucket:
-            raise ValueError("Os campos 'summaryId' e 'bucket' são obrigatórios no evento.")
+            raise ValueError("O campo 'summaryId'.")
         
         prefix = f"uploads/{summary_id}/"
-        logger.info(f"Processando bucket: {bucket}, pasta: {prefix}")
+        logger.info(f"Processing bucket: {bucket}, folder: {prefix}")
         
         mp3_files = list_mp3_files(bucket, prefix)
         
         if not mp3_files:
             return {
                 'statusCode': 200,
-                'body': json.dumps({'message': 'Nenhum arquivo MP3 encontrado para processar.'}),
+                'body': json.dumps({'message': 'No MP3 file found to process.'}),
                 'headers': {
                     'Content-Type': 'application/json'
                 }
@@ -57,7 +53,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'body': json.dumps({
-                'message': 'Transcrição concluída com sucesso.',
+                'message': 'Transcription completed with sucess.',
                 'transcriptions': transcriptions
             }),
             'headers': {
@@ -66,19 +62,17 @@ def lambda_handler(event, context):
         }
     
     except Exception as e:
-        logger.error(f"Erro na transcrição: {str(e)}")
+        logger.error(f"Failed to transcript: {str(e)}")
         return {
             'statusCode': 500,
-            'body': json.dumps({'message': 'Erro interno ao transcrever.', 'error': str(e)}),
+            'body': json.dumps({'message': 'Failed to transcript.', 'error': str(e)}),
             'headers': {
                 'Content-Type': 'application/json'
             }
         }
 
 def list_mp3_files(bucket_name, prefix):
-    """
-    Lista todos os arquivos MP3 dentro de uma pasta no bucket S3.
-    """
+
     try:
         paginator = s3_client.get_paginator('list_objects_v2')
         pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
@@ -90,25 +84,22 @@ def list_mp3_files(bucket_name, prefix):
                     if obj['Key'].lower().endswith('.mp3'):
                         mp3_files.append(obj['Key'])
         
-        logger.info(f"Arquivos MP3 encontrados: {mp3_files}")
+        logger.info(f"MP3 files found: {mp3_files}")
         return mp3_files
     except ClientError as e:
-        logger.error(f"Erro ao listar arquivos no S3: {str(e)}")
+        logger.error(f"Failed to list s3 files: {str(e)}")
         raise
 
 def transcribe_file(bucket_name, s3_key, summary_id):
-    """
-    Realiza a transcrição do arquivo de áudio usando a API Whisper da OpenAI.
-    Retorna apenas o texto completo da transcrição.
-    """
+
     try:
         local_audio_path = f"/tmp/{os.path.basename(s3_key)}"
         local_processed_audio_path = f"/tmp/processed_{os.path.basename(s3_key)}"
         
-        logger.info(f"Baixando o arquivo de áudio: {s3_key} para {local_audio_path}")
+        logger.info(f"Downloading audio file: {s3_key} para {local_audio_path}")
         s3_client.download_file(bucket_name, s3_key, local_audio_path)
         
-        logger.info(f"Processando o áudio com FFmpeg: {local_audio_path} para {local_processed_audio_path}")
+        logger.info(f"Processing audio with ffmpeg: {local_audio_path} para {local_processed_audio_path}")
         try:
             subprocess.run([
                 FFMPEG_PATH,
@@ -119,18 +110,18 @@ def transcribe_file(bucket_name, s3_key, summary_id):
                 local_processed_audio_path
             ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
-            logger.error(f"Erro ao processar o áudio com FFmpeg: {e.stderr.decode('utf-8')}")
-            raise RuntimeError(f"Erro ao processar o áudio com FFmpeg: {e.stderr.decode('utf-8')}")
+            logger.error(f"Failed to process audio with ffmpeg: {e.stderr.decode('utf-8')}")
+            raise RuntimeError(f"Failed to process audio with ffmpeg: {e.stderr.decode('utf-8')}")
         
         file_size = get_file_size(local_processed_audio_path)
-        logger.info(f"Tamanho do arquivo processado: {file_size} bytes")
+        logger.info(f"File size: {file_size} bytes")
         
         if file_size > MAX_CONTENT_SIZE:
-            logger.info("Arquivo excede o limite de tamanho. Dividindo em segmentos menores.")
+            logger.info("The file exceeds the size limit.")
             segments = split_audio(local_processed_audio_path)
             transcription_text = ""
             for idx, segment in enumerate(segments):
-                logger.info(f"Transcrevendo segmento {idx+1}/{len(segments)}")
+                logger.info(f"Transcripting segment {idx+1}/{len(segments)}")
                 transcription = transcribe_segment(segment, summary_id, idx+1)
                 transcription_text += transcription + " "
         else:
@@ -142,11 +133,11 @@ def transcribe_file(bucket_name, s3_key, summary_id):
         return transcription_text.strip()
     
     except subprocess.CalledProcessError as e:
-        logger.error(f"Erro ao processar o áudio com FFmpeg: {str(e)}")
-        raise RuntimeError(f"Erro ao processar o áudio com FFmpeg: {str(e)}")
+        logger.error(f"Failed to process audio with ffmpeg: {str(e)}")
+        raise RuntimeError(f"Failed to process audio with ffmpeg: {str(e)}")
     
     except Exception as e:
-        logger.error(f"Erro ao transcrever o arquivo {s3_key}: {str(e)}")
+        logger.error(f"Failed during the transcription {s3_key}: {str(e)}")
         raise
 
 def get_file_size(file_path):
@@ -167,8 +158,8 @@ def split_audio(audio_path, segment_duration=600):
                 segment_pattern
             ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
-            logger.error(f"Erro ao dividir o áudio com FFmpeg: {e.stderr.decode('utf-8')}")
-            raise RuntimeError(f"Erro ao dividir o áudio com FFmpeg: {e.stderr.decode('utf-8')}")
+            logger.error(f"Failed to divide the audio with ffmpeg: {e.stderr.decode('utf-8')}")
+            raise RuntimeError(f"Failed to divide the audio with ffmpeg: {e.stderr.decode('utf-8')}")
         
         segments = []
         idx = 0
@@ -180,17 +171,17 @@ def split_audio(audio_path, segment_duration=600):
             else:
                 break
         
-        logger.info(f"Total de segmentos criados: {len(segments)}")
+        logger.info(f"Total segment created: {len(segments)}")
         return segments
     except subprocess.CalledProcessError as e:
-        logger.error(f"Erro ao dividir o áudio com FFmpeg: {str(e)}")
-        raise RuntimeError(f"Erro ao dividir o áudio com FFmpeg: {str(e)}")
+        logger.error(f"Failed to divide the audio with ffmpeg: {str(e)}")
+        raise RuntimeError(f"Failed to divide the audio with ffmpeg: {str(e)}")
 
 def transcribe_segment(segment_path, summary_id, segment_number=1):
     
     try:
         with open(segment_path, "rb") as audio_file:
-            logger.info(f"Enviando o segmento {segment_number} para a API Whisper da OpenAI")
+            logger.info(f"Sending segment {segment_number} to Whisper")
             transcription = openai.Audio.transcribe(
                 model="whisper-1",
                 file=audio_file,
@@ -198,17 +189,15 @@ def transcribe_segment(segment_path, summary_id, segment_number=1):
             )
         
         transcription_text = transcription.strip()
-        logger.info(f"Transcrição realizada para {segment_path}")
+        logger.info(f"Transcription done for {segment_path}")
         
         return transcription_text
     except Exception as e:
-        logger.error(f"Erro ao transcrever o segmento {segment_path}: {str(e)}")
+        logger.error(f"Failed to transcribe segment {segment_path}: {str(e)}")
         raise
 
 def store_transcription(bucket_name, transcription_key, transcription_text):
-    """
-    Armazena a transcrição no S3.
-    """
+
     try:
         s3_client.put_object(
             Bucket=bucket_name,
@@ -216,7 +205,7 @@ def store_transcription(bucket_name, transcription_key, transcription_text):
             Body=transcription_text.encode('utf-8'),
             ContentType='text/plain'
         )
-        logger.info(f"Transcrição armazenada em {bucket_name}/{transcription_key}")
+        logger.info(f"Transcription filed at {bucket_name}/{transcription_key}")
     except ClientError as e:
-        logger.error(f"Erro ao armazenar transcrição no S3: {str(e)}")
+        logger.error(f"Failed to file transcription: {str(e)}")
         raise

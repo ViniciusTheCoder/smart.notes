@@ -12,7 +12,7 @@ def lambda_handler(event, context):
         if not file_name or not file_type:
             return {
                 'statusCode': 400,
-                'body': json.dumps({'message': 'fileName and fileType são obrigatórios.'}),
+                'body': json.dumps({'message': 'fileName and fileType are mandatory.'}),
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
@@ -53,7 +53,7 @@ def lambda_handler(event, context):
         print(e)
         return {
             'statusCode': 500,
-            'body': json.dumps({'message': 'Erro interno do servidor.'}),
+            'body': json.dumps({'message': 'Internal server error.'}),
             'headers': {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
