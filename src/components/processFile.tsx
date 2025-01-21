@@ -16,9 +16,11 @@ export default function UploadSection() {
   const [status, setStatus] = useState<ProcessingStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [summaryId, setSummaryId] = useState<string | null>(null);
 
   const MAX_FILE_SIZE = 500 * 1024 * 1024;
-  const API_ENDPOINT = process.env.NEXT_PUBLIC_GATEWAY_ENDPOINT || "";
+  const GET_UPLOAD_URL_ENDPOINT = process.env.NEXT_PUBLIC_GET_UPLOAD_URL_ENDPOINT || "";
+  const START_PROCESSING_ENDPOINT = process.env.NEXT_PUBLIC_START_PROCESSING_ENDPOINT || "";
 
   const validateAndSetFile = (selectedFile: File) => {
     const fileType = selectedFile.type;
@@ -77,16 +79,48 @@ export default function UploadSection() {
     setStatus("processing");
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch(API_ENDPOINT, {
+      const getUrlResponse = await fetch(GET_UPLOAD_URL_ENDPOINT, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error("Erro ao enviar o arquivo.");
+      if (!getUrlResponse.ok) {
+        throw new Error("Erro ao obter a URL de upload.");
+      }
+
+      const { uploadURL, summaryId } = await getUrlResponse.json();
+      setSummaryId(summaryId);
+
+      const uploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Erro ao fazer upload para o S3.");
+      }
+
+      const startProcessingResponse = await fetch(START_PROCESSING_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summaryId: summaryId,
+        }),
+      });
+
+      if (!startProcessingResponse.ok) {
+        throw new Error("Erro ao iniciar o processamento.");
       }
 
       setStatus("success");
@@ -106,10 +140,10 @@ export default function UploadSection() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Ready to Get Started?
+            Pronto para Começar?
           </h2>
           <p className="mt-6 text-lg leading-8 text-gray-600">
-            Upload your audio or video file and let our AI do the rest
+            Faça upload do seu arquivo de áudio ou vídeo e deixe nossa IA fazer o resto
           </p>
         </div>
 
@@ -129,11 +163,10 @@ export default function UploadSection() {
             >
               <Upload className="mx-auto h-12 w-12 text-gray-400" />
 
-
               <div className="mt-4">
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <span className="text-blue-600 hover:text-blue-500 font-medium">
-                    Upload a file
+                    Enviar um arquivo
                   </span>
                   <input
                     id="file-upload"
@@ -145,16 +178,16 @@ export default function UploadSection() {
                     required
                   />
                 </label>{" "}
-                <span className="text-gray-500">or drag and drop</span>
+                <span className="text-gray-500">ou arraste e solte</span>
               </div>
 
               <p className="text-xs leading-5 text-gray-500 mt-2">
-                MP3 or MP4 up to 500MB
+                MP3 ou MP4 até 500MB
               </p>
 
               {file && (
                 <p className="mt-2 text-sm text-gray-500">
-                  <strong>Selected:</strong> {file.name}
+                  <strong>Selecionado:</strong> {file.name}
                 </p>
               )}
             </div>
@@ -174,12 +207,12 @@ export default function UploadSection() {
               >
                 {isProcessing ? (
                   <>
-                    <span>Processing...</span>
+                    <span>Processando...</span>
                     <div className="ml-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   </>
                 ) : (
                   <>
-                    <span>Process File</span>
+                    <span>Processar Arquivo</span>
                     <ArrowRight className="ml-2 w-4 h-4" />
                   </>
                 )}
@@ -188,12 +221,12 @@ export default function UploadSection() {
 
             {status === "success" && (
               <div className="mt-4 p-3 bg-green-500 text-white rounded-md text-center">
-                Content generated successfully!
+                Conteúdo gerado com sucesso! Seu ID de resumo é: {summaryId}
               </div>
             )}
             {status === "error" && (
               <div className="mt-4 p-3 bg-red-500 text-white rounded-md text-center">
-                {errorMessage || "Whoops!!! It seems we got an error."}
+                {errorMessage || "Ocorreu um erro."}
               </div>
             )}
           </form>
