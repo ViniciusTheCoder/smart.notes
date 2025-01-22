@@ -23,7 +23,7 @@ export default function UploadSection() {
 
   const [showProgressBar, setShowProgressBar] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
-  const timerId = useRef<NodeJS.Timeout | null>(null);
+  const timerId = useRef<number | null>(null);
 
   const MAX_FILE_SIZE = 500 * 1024 * 1024;
   const GET_UPLOAD_URL_ENDPOINT = process.env.NEXT_PUBLIC_GET_UPLOAD_URL_ENDPOINT || "";
@@ -123,7 +123,7 @@ export default function UploadSection() {
 
       setStatus("success");
 
-      timerId.current = setTimeout(() => {
+      timerId.current = window.setTimeout(() => {
         setShowProgressBar(false);
         const fetchSummary = async () => {
           if (!summaryId) return;
@@ -138,16 +138,23 @@ export default function UploadSection() {
             }
             const { content } = await response.json();
             setSummaryContent(content);
-          } catch (error: any) {
-            setErrorMessage(error.message || "Failed to fetch summary.");
+          } catch (error: unknown) {
+            if (error instanceof Error) {
+              setErrorMessage(error.message);
+            } else {
+              setErrorMessage("Failed to fetch summary.");
+            }
             setStatus("error");
           }
         };
         fetchSummary();
       }, 4 * 60 * 1000);
-    } catch (error: any) {
-      console.error(error);
-      setErrorMessage(error.message || "Failed to process file.");
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("Failed to process file.");
+      }
       setStatus("error");
       setShowProgressBar(false);
     } finally {
@@ -240,7 +247,37 @@ export default function UploadSection() {
               </button>
             </div>
 
-            {status === "success" }
+            {status === "success" && summaryContent && (
+              <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-2xl font-bold mb-4 text-black">AI Summary</h3>
+                <ReactMarkdown
+                  components={{
+                    h1: (props) => (
+                      <h1 className="text-2xl font-bold mt-4 mb-2 text-black" {...props} />
+                    ),
+                    h2: (props) => (
+                      <h2 className="text-xl font-bold mt-3 mb-2 text-black" {...props} />
+                    ),
+                    h3: (props) => (
+                      <h3 className="text-lg font-semibold mt-3 mb-2 text-black" {...props} />
+                    ),
+                    p: (props) => (
+                      <p className="mb-4 leading-relaxed text-black" {...props} />
+                    ),
+                    ul: (props) => (
+                      <ul className="list-disc list-inside mb-4" {...props} />
+                    ),
+                    li: (props) => <li className="mb-1 text-black" {...props} />,
+                    strong: (props) => (
+                      <strong className="font-semibold text-black" {...props} />
+                    ),
+                  }}
+                >
+                  {summaryContent}
+                </ReactMarkdown>
+              </div>
+            )}
+
             {status === "error" && (
               <div className="mt-4 p-3 bg-red-500 text-white rounded-md text-center">
                 {errorMessage || "Error :(."}
@@ -256,37 +293,6 @@ export default function UploadSection() {
               <span className="ml-4 text-gray-700">
                 Processing... Please, be patient.
               </span>
-            </div>
-          )}
-
-          {summaryContent && (
-            <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-2xl font-bold mb-4 text-black">AI Summary</h3>
-              <ReactMarkdown
-                components={{
-                  h1: ({node, ...props}) => (
-                    <h1 className="text-2xl font-bold mt-4 mb-2 text-black" {...props} />
-                  ),
-                  h2: ({node, ...props}) => (
-                    <h2 className="text-xl font-bold mt-3 mb-2 text-black" {...props} />
-                  ),
-                  h3: ({node, ...props}) => (
-                    <h3 className="text-lg font-semibold mt-3 mb-2 text-black" {...props} />
-                  ),
-                  p: ({node, ...props}) => (
-                    <p className="mb-4 leading-relaxed text-black" {...props} />
-                  ),
-                  ul: ({node, ...props}) => (
-                    <ul className="list-disc list-inside mb-4" {...props} />
-                  ),
-                  li: ({node, ...props}) => <li className="mb-1 text-black" {...props} />,
-                  strong: ({node, ...props}) => (
-                    <strong className="font-semibold text-black" {...props} />
-                  ),
-                }}
-              >
-                {summaryContent}
-              </ReactMarkdown>
             </div>
           )}
         </div>
