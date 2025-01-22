@@ -11,7 +11,7 @@ export default function Footer() {
         <p className="text-sm">
           &copy; 2025 Vinicius Gurski Ferraz, Powered by{" "}
           <a
-            href="https://seulink-aqui.com" 
+            href="https://github.com/ViniciusTheCoder" 
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-500 hover:text-blue-400"
@@ -23,7 +23,7 @@ export default function Footer() {
 
         <div className="flex items-center gap-5">
           <a
-            href="mailto:seu-email@exemplo.com"
+            href="mailto:vinigurskiferraz@gmail.com"
             className="hover:text-white"
             title="Email"
           >
