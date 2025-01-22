@@ -19,11 +19,13 @@ export default function UploadSection() {
   const [status, setStatus] = useState<ProcessingStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [dragActive, setDragActive] = useState(false);
-  const [summaryId, setSummaryId] = useState<string | null>(null);
 
   const [showProgressBar, setShowProgressBar] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
   const timerId = useRef<number | null>(null);
+  
+
+  const summaryIdRef = useRef<string | null>(null);
 
   const MAX_FILE_SIZE = 500 * 1024 * 1024;
   const GET_UPLOAD_URL_ENDPOINT = process.env.NEXT_PUBLIC_GET_UPLOAD_URL_ENDPOINT || "";
@@ -99,7 +101,7 @@ export default function UploadSection() {
       }
 
       const { uploadURL, summaryId } = await getUrlResponse.json();
-      setSummaryId(summaryId);
+      summaryIdRef.current = summaryId; // Use a referência
 
       const uploadResponse = await fetch(uploadURL, {
         method: "PUT",
@@ -126,12 +128,13 @@ export default function UploadSection() {
       timerId.current = window.setTimeout(() => {
         setShowProgressBar(false);
         const fetchSummary = async () => {
-          if (!summaryId) return;
+          const currentSummaryId = summaryIdRef.current; // Use a referência
+          if (!currentSummaryId) return;
           try {
             const response = await fetch(FETCH_SUMMARY_ENDPOINT, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ summaryId }),
+              body: JSON.stringify({ summaryId: currentSummaryId }),
             });
             if (!response.ok) {
               throw new Error("Failed to fetch summary.");
