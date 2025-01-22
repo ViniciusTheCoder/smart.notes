@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS-Serverless-2016-10-31
+Description: >
+  Template to build Smart.Notes backend
+
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 128
+
+Resources:
+
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties: 
+      Name: SmartNotes
+      StageName: dev
+
+  DataS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: docs-to-summary
+
+  LayersS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: layers-to-smartnotes # this bucket is to store the lambda layers (openai, ffmpeg, requests)
+
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+      Properties: 
+        TableName: smart-notes-summary-table
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: created_at
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+  generateS3UrlsFunction:
+    Type: AWS::Serverless::Function  
+    Properties:
+      FunctionName: generateS3Urls
+      CodeUri: lambda/
+      Handler: generateS3Urls.lambda_handler
+      Runtime: python3.12
+      Architectures::
+        - x86_64
+      Timeout: 5
+      Events:
+        ApiRoute: 
+          Type: Api
+          Properties:
+            Path: /generate-presigned-urls
+            Method: POST
+            RestApiId: ! RefApiGateway
+      Policies:
+      - AWSLambdaBasicExecutionRole
+
+  getMdFileFunction: 
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: getMdFile
+      CodeUri: lambda/
+      Handler: getMdFile.lambda_handler
+      Runtime: python3.12
+      Architectures::
+        - x86_64
+      Timeout: 15
+      Events:
+        ApiRoute: 
+          Type: Api
+          Properties:
+            Path: /get-md-file
+            Method: POST
+            RestApiId: ! RefApiGateway
+      Policies:
+      - AWSLambdaBasicExecutionRole 
+
+  powerSummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: powerSummary
+      CodeUri: lambda/
+      Handler: powerSummary.lambda_handler
+      Runtime: python3.12
+      Architectures::
+        - x86_64
+      Timeout: 300
+      MemorySize: 514
+      Policies:
+      - AWSLambdaBasicExecutionRole
+
+  startAnalysis:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: startAnalysis
+      CodeUri: lambda/
+      Handler: startAnalysis.lambda_handler
+      Runtime: python3.12
+      Architectures::
+        - x86_64
+      Timeout: 5
+      Events:
+        ApiRoute: 
+          Type: Api
+          Properties:
+            Path: /start-analysis
+            Method: POST
+            RestApiId: ! RefApiGateway
+      Policies:
+      - AWSLambdaBasicExecutionRole
+
+Outputs:
+  S3BucketName:
+    Description: Created Bucket
+    Value: "Both layer and data storage bucket"
+
+  DynamoDbTableName:
+    Description: Created table
+    Value: "Dynamo table"
+
+  LambdaFunctions:
+    Description: Created functions
+    Value: "genereteUrls, getMd, powerSummary and analysisStarter"
+
+  ApiName:
+    Description: Created gateway
+    Value: "API and all routes"

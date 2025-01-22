@@ -1,0 +1,13 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "your-stack-here"
+s3_bucket = "your-bucket-here"
+s3_prefix = "your-s3-prefix-here" #OPTIONAL
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+[default.build]
+[default.build.parameters]
+parallel="true"
+use_container="true"
