@@ -5,8 +5,11 @@ import React, {
   ChangeEvent,
   FormEvent,
   DragEvent,
+  useEffect,
+  useRef,
 } from "react";
 import { Upload, ArrowRight } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 type ProcessingStatus = "idle" | "processing" | "success" | "error";
 
@@ -18,9 +21,14 @@ export default function UploadSection() {
   const [dragActive, setDragActive] = useState(false);
   const [summaryId, setSummaryId] = useState<string | null>(null);
 
+  const [showProgressBar, setShowProgressBar] = useState(false);
+  const [summaryContent, setSummaryContent] = useState<string | null>(null);
+  const timerId = useRef<NodeJS.Timeout | null>(null);
+
   const MAX_FILE_SIZE = 500 * 1024 * 1024;
   const GET_UPLOAD_URL_ENDPOINT = process.env.NEXT_PUBLIC_GET_UPLOAD_URL_ENDPOINT || "";
   const START_PROCESSING_ENDPOINT = process.env.NEXT_PUBLIC_START_PROCESSING_ENDPOINT || "";
+  const FETCH_SUMMARY_ENDPOINT = process.env.NEXT_PUBLIC_FETCH_SUMMARY_ENDPOINT || "";
 
   const validateAndSetFile = (selectedFile: File) => {
     const fileType = selectedFile.type;
@@ -36,11 +44,11 @@ export default function UploadSection() {
         setErrorMessage("");
         setStatus("idle");
       } else {
-        setErrorMessage("O arquivo excede o tamanho máximo de 500MB.");
+        setErrorMessage("This file exceeds the 500MB maximum size allowed.");
         setFile(null);
       }
     } else {
-      setErrorMessage("Por favor, selecione um arquivo MP3 ou MP4.");
+      setErrorMessage("Please select a mp3 or mp4 file.");
       setFile(null);
     }
   };
@@ -59,7 +67,6 @@ export default function UploadSection() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       validateAndSetFile(e.dataTransfer.files[0]);
     }
@@ -77,17 +84,14 @@ export default function UploadSection() {
 
     setIsProcessing(true);
     setStatus("processing");
+    setShowProgressBar(true);
+    setSummaryContent(null);
 
     try {
       const getUrlResponse = await fetch(GET_UPLOAD_URL_ENDPOINT, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: file.name, fileType: file.type }),
       });
 
       if (!getUrlResponse.ok) {
@@ -99,41 +103,65 @@ export default function UploadSection() {
 
       const uploadResponse = await fetch(uploadURL, {
         method: "PUT",
-        headers: {
-          "Content-Type": file.type,
-        },
+        headers: { "Content-Type": file.type },
         body: file,
       });
 
       if (!uploadResponse.ok) {
-        throw new Error("Erro ao fazer upload para o S3.");
+        throw new Error("Failed to upload file to s3.");
       }
 
       const startProcessingResponse = await fetch(START_PROCESSING_ENDPOINT, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          summaryId: summaryId,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summaryId }),
       });
 
       if (!startProcessingResponse.ok) {
-        throw new Error("Erro ao iniciar o processamento.");
+        throw new Error("Failed to initialize processing.");
       }
 
       setStatus("success");
+
+      timerId.current = setTimeout(() => {
+        setShowProgressBar(false);
+        const fetchSummary = async () => {
+          if (!summaryId) return;
+          try {
+            const response = await fetch(FETCH_SUMMARY_ENDPOINT, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ summaryId }),
+            });
+            if (!response.ok) {
+              throw new Error("Failed to fetch summary.");
+            }
+            const { content } = await response.json();
+            setSummaryContent(content);
+          } catch (error: any) {
+            setErrorMessage(error.message || "Failed to fetch summary.");
+            setStatus("error");
+          }
+        };
+        fetchSummary();
+      }, 4 * 60 * 1000);
     } catch (error: any) {
       console.error(error);
-      setErrorMessage(
-        error.message || "Ocorreu um erro ao processar o arquivo."
-      );
+      setErrorMessage(error.message || "Failed to process file.");
       setStatus("error");
+      setShowProgressBar(false);
     } finally {
       setIsProcessing(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (timerId.current) {
+        clearTimeout(timerId.current);
+      }
+    };
+  }, []);
 
   return (
     <div id="uploadSection" className="bg-gray-50 py-24 sm:py-32">
@@ -143,30 +171,26 @@ export default function UploadSection() {
             Ready to Start?
           </h2>
           <p className="mt-6 text-lg leading-8 text-gray-600">
-            Upload your files and let AI do their magic.
+            Upload your files and let AI do their magic
           </p>
         </div>
 
         <div className="mx-auto mt-16 max-w-2xl sm:mt-20">
           <form onSubmit={handleSubmit}>
             <div
-              className={`relative rounded-lg border-2 border-dashed p-12 text-center 
-                ${
-                  dragActive
-                    ? "border-gray-500 bg-gray-100"
-                    : "border-gray-300"
-                }`}
+              className={`relative rounded-lg border-2 border-dashed p-12 text-center ${
+                dragActive ? "border-gray-500 bg-gray-100" : "border-gray-300"
+              }`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
             >
               <Upload className="mx-auto h-12 w-12 text-gray-400" />
-
               <div className="mt-4">
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <span className="text-blue-600 hover:text-blue-500 font-medium">
-                    Enviar um arquivo
+                    Upload file
                   </span>
                   <input
                     id="file-upload"
@@ -178,16 +202,14 @@ export default function UploadSection() {
                     required
                   />
                 </label>{" "}
-                <span className="text-gray-500">ou arraste e solte</span>
+                <span className="text-gray-500">or drag and drop</span>
               </div>
-
               <p className="text-xs leading-5 text-gray-500 mt-2">
-                MP3 ou MP4 até 500MB
+                MP3 or MP4 - 500MB
               </p>
-
               {file && (
                 <p className="mt-2 text-sm text-gray-500">
-                  <strong>Selecionado:</strong> {file.name}
+                  <strong>Selected:</strong> {file.name}
                 </p>
               )}
             </div>
@@ -200,36 +222,73 @@ export default function UploadSection() {
               <button
                 type="submit"
                 disabled={isProcessing || !file}
-                className={`inline-flex items-center rounded-full bg-blue-500 px-8 py-3 text-white font-semibold 
-                  hover:bg-blue-600 transition ${
-                    isProcessing ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                className={`inline-flex items-center rounded-full bg-blue-500 px-8 py-3 text-white font-semibold hover:bg-blue-600 transition ${
+                  isProcessing ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
                 {isProcessing ? (
                   <>
-                    <span>Processando...</span>
+                    <span>Processing...</span>
                     <div className="ml-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   </>
                 ) : (
                   <>
-                    <span>Processar Arquivo</span>
+                    <span>Process File</span>
                     <ArrowRight className="ml-2 w-4 h-4" />
                   </>
                 )}
               </button>
             </div>
 
-            {status === "success" && (
-              <div className="mt-4 p-3 bg-green-500 text-white rounded-md text-center">
-                Conteúdo gerado com sucesso! Seu ID de resumo é: {summaryId}
-              </div>
-            )}
+            {status === "success" }
             {status === "error" && (
               <div className="mt-4 p-3 bg-red-500 text-white rounded-md text-center">
-                {errorMessage || "Ocorreu um erro."}
+                {errorMessage || "Error :(."}
               </div>
             )}
           </form>
+
+          {showProgressBar && (
+            <div className="mt-6 flex justify-center items-center">
+              <div className="w-1/2 bg-gray-200 rounded-full h-4">
+                <div className="bg-blue-600 h-4 rounded-full animate-pulse w-full"></div>
+              </div>
+              <span className="ml-4 text-gray-700">
+                Processing... Please, be patient.
+              </span>
+            </div>
+          )}
+
+          {summaryContent && (
+            <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
+              <h3 className="text-2xl font-bold mb-4 text-black">AI Summary</h3>
+              <ReactMarkdown
+                components={{
+                  h1: ({node, ...props}) => (
+                    <h1 className="text-2xl font-bold mt-4 mb-2 text-black" {...props} />
+                  ),
+                  h2: ({node, ...props}) => (
+                    <h2 className="text-xl font-bold mt-3 mb-2 text-black" {...props} />
+                  ),
+                  h3: ({node, ...props}) => (
+                    <h3 className="text-lg font-semibold mt-3 mb-2 text-black" {...props} />
+                  ),
+                  p: ({node, ...props}) => (
+                    <p className="mb-4 leading-relaxed text-black" {...props} />
+                  ),
+                  ul: ({node, ...props}) => (
+                    <ul className="list-disc list-inside mb-4" {...props} />
+                  ),
+                  li: ({node, ...props}) => <li className="mb-1 text-black" {...props} />,
+                  strong: ({node, ...props}) => (
+                    <strong className="font-semibold text-black" {...props} />
+                  ),
+                }}
+              >
+                {summaryContent}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
       </div>
     </div>
