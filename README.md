@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/05dbd8f6-f872-4422-aba4-d204b85fe5f6
 ## How to Run 🏃
 - Clone this repo 
 ```bash
-git clone https://github.com/arthcc/tech-ears](https://github.com/ViniciusTheCoder/smart.notes.git
+git clone https://github.com/ViniciusTheCoder/smart.notes.git
 ```
 
 Now go to ```cd smart-notes``` and run ```npm install```
