@@ -9,7 +9,7 @@ export default function Footer() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4">
         
         <p className="text-sm">
-          &copy; 2025 Vinicius Gurski Ferraz, Powered by{" "}
+          &copy; 2025 Smart.Notes, Powered by{" "}
           <a
             href="https://github.com/ViniciusTheCoder" 
             target="_blank"
