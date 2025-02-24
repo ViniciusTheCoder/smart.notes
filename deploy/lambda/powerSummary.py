@@ -22,7 +22,7 @@ bedrock_client = boto3.client(
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
-BUCKET_NAME = "documentos-to-summary"
+BUCKET_NAME = os.getenv("BUCKET_NAME")
 TRANSCRIPTION_OUTPUT_PREFIX = os.getenv("TRANSCRIPTION_OUTPUT_PREFIX", "transcriptions/")
 RESULTS_PREFIX = "results/"
 
